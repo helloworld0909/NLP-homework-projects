@@ -23,21 +23,37 @@ def oneEditOpt(correct, raw):
 def editOpts(correct, raw, threshold=2):
     opts = Levenshtein.editops(correct, raw)
     opsLength = len(opts)
-    if opsLength > threshold or opsLength == 0:
-        return None
-    elif opsLength == 2:
-        opt1 = opts[0]
-        opt2 = opts[1]
-        idx1 = opt1[1]
-        idx2 = opt2[1]
-        if opt1[0] == opt2[0] == 'replace' and abs(idx1 - idx2) == 1 and correct[idx1] == raw[idx2] and correct[idx2] == \
-                raw[idx1]:
-            return [('transposition', idx1, idx2)]
-        else:
-            return opts
-    else:
-        return opts
 
+    transOpts = []
+    if opsLength == 0:
+        transOpts = None
+    elif opsLength >= 2:
+        idx = 0
+        while idx < opsLength - 1:
+            opt1 = opts[idx]
+            opt2 = opts[idx + 1]
+            idx1 = opt1[2]
+            idx2 = opt2[2]
+            try:
+                if opt1[0] == opt2[0] == 'replace' and abs(idx1 - idx2) == 1 and correct[idx1] == raw[idx2] and correct[idx2] == raw[idx1]:
+                    transOpts.append(('transposition', idx1, idx2))
+                    idx += 2
+                else:
+                    transOpts.append(opt1)
+                    idx += 1
+            except:
+                transOpts.append(opt1)
+                idx += 1
+
+        if idx == opsLength - 1:
+            transOpts.append(opts[idx])
+    else:
+        transOpts = opts
+
+    if transOpts and len(transOpts) > threshold:
+        return None
+    else:
+        return transOpts
 
 
 def normalizeOpt(correct, raw, opt):
@@ -72,8 +88,13 @@ def normalizeOpt(correct, raw, opt):
 
 
 if __name__ == '__main__':
-    testSet = [('abc', 'abc'), ('abcd', 'acbd'), ('abc', 'abcd'), ('abc', 'acbd'), ('abc', 'adbc')]
+    testSet = [('PADDING_TOKEN', 'protectionst'), ('abc', 'abc'), ('abcd', 'acbd'), ('abc', 'abcde'), ('abcde', 'acbdd'), ('abc', 'adbc')]
 
     for pair in testSet:
-        opt = oneEditOpt(*pair)
-        print(pair, opt, normalizeOpt(*pair, opt))
+        opts = editOpts(*pair)
+        print(opts)
+        if opts is not None:
+            print(pair, opts, list(map(lambda opt: normalizeOpt(*pair, opt), opts)))
+        else:
+            print(pair, opts, None)
+        print('\n')
