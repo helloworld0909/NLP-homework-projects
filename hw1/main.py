@@ -1,6 +1,6 @@
 import logging
 import nltk
-from hw1.util.noisyChannel import NoisyChannel
+from util.noisyChannel import NoisyChannel
 
 logging.basicConfig(
     level=logging.DEBUG,

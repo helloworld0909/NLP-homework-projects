@@ -1,5 +1,5 @@
 import logging
-from hw1.util.editDistance import editOpts, normalizeOpt
+from util.editDistance import editOpts, normalizeOpt
 from nltk.probability import FreqDist
 
 

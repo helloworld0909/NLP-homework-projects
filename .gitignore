@@ -154,4 +154,5 @@ crashlytics-build.properties
 fabric.properties
 
 *.pdf
+*.docx
 

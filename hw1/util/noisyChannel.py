@@ -1,6 +1,6 @@
 import logging
 import nltk
-from hw1.util import vocabulary, confusionMatrix, editDistance, langModel
+from util import vocabulary, confusionMatrix, editDistance, langModel
 
 class NoisyChannel(object):
 
