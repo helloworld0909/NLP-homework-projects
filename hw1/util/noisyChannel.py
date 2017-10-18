@@ -12,7 +12,7 @@ class NoisyChannel(object):
         self.confMat.loadErrors(inputPath + 'count_1edit.txt')
 
         self.langModel = langModel.LangModel(nltkCorpus=nltk.corpus.reuters, vocab=self.vocab)
-        self.langModel.initUnigram()
+        self.langModel.initBigram()
 
         self.charCount = self.langModel.getCharCount()
         self.charPairCount = self.langModel.getCharPairCount()
@@ -25,7 +25,7 @@ class NoisyChannel(object):
     def getCandidates(self, token, threshold=2):
         return self.vocab.getEditDistanceCandidates(token, threshold)
 
-    def getCandidateProb(self, candidate):
+    def getCandidateProb(self, candidate, before):
         token, opts = candidate
         conditionalProb = 1.0
         for opt in opts:
@@ -43,17 +43,18 @@ class NoisyChannel(object):
 
             conditionalProb *= float(errorCount) / totalCount
 
-        wordProb = self.langModel.getProb(token, ngram=1)
+        query = tuple(before + [token])
+        wordProb = self.langModel.getProb(query, ngram=2)
         prob = wordProb * conditionalProb
 
         return prob
 
-    def getCorrectToken(self, token):
+    def getCorrectToken(self, token, before):
         candidates = self.getCandidates(token, threshold=self.candidateThreshold)
         if not candidates:
             return token
         else:
-            return max(candidates, key=self.getCandidateProb)[0]
+            return max(candidates, key=lambda candidate: self.getCandidateProb(candidate, before))[0]
 
 
 

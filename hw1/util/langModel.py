@@ -44,19 +44,21 @@ class LangModel(object):
 
         self.nCount[2] = FreqDist(list(self.models[2].values()))
         self.nCount[2][0] = self.nCount[2][1]
-        logging.debug('nCount: {}'.format(dict(self.nCount[1])))
+        logging.debug('nCount2: {}'.format(dict(self.nCount[2])))
 
         logging.info('Bigram vocabSize: {}'.format(self.vocabSize[2]))
         logging.info('Bigram word count: {}'.format(self.wordcount[2]))
 
 
-    def getCstar(self, c, cutoff=20, ngram=1):
-        if c <= cutoff:
+    def getCstar(self, c, ngram, cutoff=10):
+        if 0 < c <= cutoff:
             div = self.nCount[ngram][c]
             if div != 0:
                 return (c + 1) * self.nCount[ngram][c + 1] / div
             else:
                 return 0
+        elif c == 0:
+            return 3e-5
         else:
             return c
 
@@ -66,7 +68,7 @@ class LangModel(object):
         if ngram == 1:
             return self.getCstar(self.models[ngram][query], ngram=ngram) / self.wordcount[ngram]
         elif ngram == 2:
-            return self.getCstar(self.models[ngram][query], ngram=ngram) / self.models[ngram - 1][query[0]]
+            return self.getCstar(self.models[ngram][query], ngram=ngram) / self.getCstar(self.models[ngram - 1][query[0]], ngram=ngram - 1)
 
     def getCharCount(self):
         charCount = defaultdict(int)

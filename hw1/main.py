@@ -24,7 +24,11 @@ with open(inputPath + 'testdata.txt', 'r', encoding='utf-8') as inputFile:
             tokenList = nltk.word_tokenize(sent)
             for idx, token in enumerate(tokenList):
                 if not model.inVocab(token):
-                    correctToken = model.getCorrectToken(token)
+                    if idx == 0:
+                        before = ['<s>']
+                    else:
+                        before = [tokenList[idx - 1]]
+                    correctToken = model.getCorrectToken(token, before)
                     tokenList[idx] = correctToken
                     if token != correctToken:
                         correctionCount += 1
