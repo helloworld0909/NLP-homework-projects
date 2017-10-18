@@ -13,7 +13,5 @@ for i in range(1000):
     if ansset==resultset:
         count+=1
     else:
-        print(sorted(ansset))
-        print(sorted(resultset))
-        print('\n')
+        print(sorted(ansset - (ansset & resultset)), sorted(resultset - (ansset & resultset)))
 print("Accuracy is : %.2f%%" % (count*1.00/10))

@@ -11,7 +11,7 @@ class NoisyChannel(object):
         self.confMat = confusionMatrix.ConfusionMatrix()
         self.confMat.loadErrors(inputPath + 'count_1edit.txt')
 
-        self.langModel = langModel.LangModel(nltkCorpus=nltk.corpus.brown)
+        self.langModel = langModel.LangModel(nltkCorpus=nltk.corpus.reuters, vocab=self.vocab)
         self.langModel.initUnigram()
 
         self.charCount = self.langModel.getCharCount()
