@@ -1,10 +1,11 @@
 import logging
+import math
 import nltk
 from util import vocabulary, confusionMatrix, editDistance, langModel
 
 class NoisyChannel(object):
 
-    def __init__(self, inputPath, candidateThreshold=2):
+    def __init__(self, inputPath, candidateThreshold=2, ngram=2):
         self.vocab = vocabulary.Vocab()
         self.vocab.loadVocab(inputPath + 'vocab.txt')
 
@@ -12,7 +13,12 @@ class NoisyChannel(object):
         self.confMat.loadErrors(inputPath + 'count_1edit.txt')
 
         self.langModel = langModel.LangModel(nltkCorpus=nltk.corpus.reuters, vocab=self.vocab)
-        self.langModel.initBigram()
+        if ngram == 1:
+            self.langModel.initUnigram()
+        elif ngram == 2:
+            self.langModel.initBigram()
+        else:
+            raise NotImplementedError('Not support this n-gram model')
 
         self.charCount = self.langModel.getCharCount()
         self.charPairCount = self.langModel.getCharPairCount()
@@ -38,13 +44,11 @@ class NoisyChannel(object):
             else:
                 totalCount = self.charPairCount[charPair]
 
-            if totalCount == 0:
-                return 0.0
+            conditionalProb *= (float(errorCount) + 1) / (totalCount + self.confMat.getErrorVocabSize(optType))
 
-            conditionalProb *= float(errorCount) / totalCount
-
+        ngram = len(before) + 1
         query = tuple(before + [token])
-        wordProb = self.langModel.getProb(query, ngram=2)
+        wordProb = self.langModel.getProb(query, ngram=ngram)
         prob = wordProb * conditionalProb
 
         return prob
@@ -56,6 +60,18 @@ class NoisyChannel(object):
         else:
             return max(candidates, key=lambda candidate: self.getCandidateProb(candidate, before))[0]
 
+    def generateBefore(self, tokenList, tokenIdx, ngram):
+        if ngram == 1:
+            return []
+        elif ngram == 2:
+            if tokenIdx == 0:
+                before = ['<s>']
+            else:
+                before = [tokenList[tokenIdx - 1]]
+        else:
+            raise NotImplementedError('Not support this n-gram model')
+        return before
+
 
 
 if __name__ == '__main__':
@@ -66,6 +82,6 @@ if __name__ == '__main__':
     )
 
     model = NoisyChannel(inputPath='E:/python_workspace/NLP-homework-projects/hw1/data/')
-    print(model.getCorrectToken('teh'))
-    print(model.getCorrectToken('miann'))
+    print(model.getCorrectToken('Teh', ('<s>', )))
+    print(model.getCorrectToken('miann', ('the', )))
 

@@ -10,7 +10,8 @@ logging.basicConfig(
 
 inputPath = 'E:/python_workspace/NLP-homework-projects/hw1/data/'
 
-model = NoisyChannel(inputPath, candidateThreshold=2)
+NGRAM = 2
+model = NoisyChannel(inputPath, candidateThreshold=2, ngram=NGRAM)
 
 with open(inputPath + 'testdata.txt', 'r', encoding='utf-8') as inputFile:
     with open(inputPath + 'result.txt', 'w', encoding='utf-8') as outputFile:
@@ -24,10 +25,7 @@ with open(inputPath + 'testdata.txt', 'r', encoding='utf-8') as inputFile:
             tokenList = nltk.word_tokenize(sent)
             for idx, token in enumerate(tokenList):
                 if not model.inVocab(token):
-                    if idx == 0:
-                        before = ['<s>']
-                    else:
-                        before = [tokenList[idx - 1]]
+                    before = model.generateBefore(tokenList, idx, ngram=NGRAM)
                     correctToken = model.getCorrectToken(token, before)
                     tokenList[idx] = correctToken
                     if token != correctToken:

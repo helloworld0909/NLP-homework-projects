@@ -88,7 +88,7 @@ def normalizeOpt(correct, raw, opt):
 
 
 if __name__ == '__main__':
-    testSet = [('PADDING_TOKEN', 'protectionst'), ('abc', 'abc'), ('abcd', 'acbd'), ('abc', 'abcde'), ('abcde', 'acbdd'), ('abc', 'adbc')]
+    testSet = [('PADDING_TOKEN', 'protectionst'), ('The', 'T'), ('abcd', 'acbd'), ('abc', 'abcde'), ('abcde', 'acbdd'), ('abc', 'adbc')]
 
     for pair in testSet:
         opts = editOpts(*pair)

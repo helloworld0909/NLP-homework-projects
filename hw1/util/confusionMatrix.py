@@ -47,6 +47,8 @@ class ConfusionMatrix(object):
     def getErrorCount(self, optType, charPair):
         return self.errorFreqMatrices.get(optType, {}).get(charPair, 0)
 
+    def getErrorVocabSize(self, optType):
+        return len(self.errorFreqMatrices.get(optType, {}))
 
 
 if __name__ == '__main__':
