@@ -26,7 +26,7 @@ class NaiveBayes(object):
         for labelIdx in range(self.probMatrix.shape[0]):
             self.probMatrix[labelIdx] += 1
             self.probMatrix[labelIdx] /= (self.probMatrix[labelIdx].sum() + self.vocabSize)
-            self.probLabel[labelIdx] /= self.probLabel[labelIdx].sum()
+        self.probLabel /= self.probLabel.sum()
 
 
     def predict(self, X):
