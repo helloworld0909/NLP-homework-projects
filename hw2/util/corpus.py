@@ -1,6 +1,7 @@
 import re
 import json
 import jieba
+import nltk
 import logging
 
 
@@ -8,6 +9,7 @@ class CorpusCN(object):
 
     token2idx = {'PADDING_TOKEN': 0,'UNKNOWN_TOKEN': 1}
     label2idx = {}
+    tokenFreqDist = nltk.FreqDist()
 
     def __init__(self):
         pass
@@ -15,6 +17,7 @@ class CorpusCN(object):
     def extendToken2idx(self, tokenList):
         newCnt = 0
         for token in tokenList:
+            self.tokenFreqDist[token] += 1
             if token not in self.token2idx:
                 self.token2idx[token] = len(self.token2idx)
                 newCnt += 1
@@ -36,7 +39,7 @@ class CorpusCN(object):
             res.extend(re.findall(r"[^。！？]+[。！？]|[^。！？]+$", sent))
         return filter(lambda s: s, res)
 
-    def loadJsonFile(self, filename):
+    def loadJsonFile(self, filename, translate=True):
         X_ = {}
 
         with open(filename, 'r', encoding='utf-8') as inputFile:
@@ -46,11 +49,15 @@ class CorpusCN(object):
 
                 titleTokenList = jsonObj['title']
                 self.extendToken2idx(titleTokenList)
-                vec.append(self.translateTokenList(titleTokenList))
+                if translate:
+                    titleTokenList = self.translateTokenList(titleTokenList)
+                vec.append(titleTokenList)
 
                 contentTokenList = jsonObj['content']
-                contentVec = self.translateTokenList(contentTokenList)
-                vec.append(contentVec)
+                self.extendToken2idx(contentTokenList)
+                if translate:
+                    contentTokenList = self.translateTokenList(contentTokenList)
+                vec.append(contentTokenList)
 
                 X_[jsonObj['id']] = vec
 
@@ -75,6 +82,13 @@ class CorpusCN(object):
 
     def getLabelSize(self):
         return len(self.label2idx)
+
+    def toNLTKFormat(self, x_vec, vocabulary):
+        tokenIdxSet = set(x_vec)
+        features = {}
+        for token in vocabulary:
+            features[token] = self.token2idx.get(token) in tokenIdxSet
+        return features
 
 if __name__ == '__main__':
     corpus = CorpusCN()
