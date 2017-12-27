@@ -157,3 +157,23 @@ fabric.properties
 *.docx
 slides/
 
+.idea/
+14307110170_homework-1.zip
+hw1/data/
+hw2/data/
+"hw2/hw2-\347\275\227\351\222\26214307110170.zip"
+hw2/result.txt
+hw3/argument_model
+hw3/argument_result.txt
+hw3/chinese event extraction.pptx
+hw3/crf_input/
+hw3/hw3-14307110170.zip
+hw3/input/
+hw3/model
+hw3/trigger_model
+hw3/trigger_raw.txt
+hw3/trigger_result.txt
+hw3/~WRL3344.tmp
+hw4/datasets/
+hw4/word2vec-and-sentiment-analysis.zip
+hw4/*.npy

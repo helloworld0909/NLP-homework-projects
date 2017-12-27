@@ -23,11 +23,10 @@ def softmax(x):
 def normalizeRows(x):
     """ Row normalization function """
     # Implement a function that normalizes each row of a matrix to have unit length
-    
-    ### YOUR CODE HERE
-    raise NotImplementedError
-    ### END YOUR CODE
-    
+
+    coefficients = 1 / np.sqrt(np.sum(np.square(x), axis=1))
+    x = (x.T * coefficients).T
+
     return x
 
 def test_normalize_rows():
@@ -59,12 +58,23 @@ def softmaxCostAndGradient(predicted, target, outputVectors, dataset):
     #        vector                                                
     # - grad: the gradient with respect to all the other word        
     #        vectors
-    
-    ### YOUR CODE HERE
-    raise NotImplementedError
-    ### END YOUR CODE
+
+    y_hat = softmax(np.dot(outputVectors, predicted))
+    cost = -np.log(y_hat[target])
+
+    y_hatPrime = y_hat.copy()
+    y_hatPrime[target] -= 1.0
+
+    gradPred = np.dot(outputVectors.T, y_hatPrime)
+    grad = np.outer(y_hatPrime, predicted)
     
     return cost, gradPred, grad
+
+def sampleTokenIdxNoTarget(target, dataset):
+    idx = dataset.sampleTokenIdx()
+    while idx == target:
+        idx = dataset.sampleTokenIdx()
+    return idx
 
 def negSamplingCostAndGradient(predicted, target, outputVectors, dataset, 
     K=10):
@@ -80,9 +90,22 @@ def negSamplingCostAndGradient(predicted, target, outputVectors, dataset,
     #                                       
     # Input/Output Specifications: same as softmaxCostAndGradient
     
-    ### YOUR CODE HERE
-    raise NotImplementedError
-    ### END YOUR CODE
+    sampleIndices = [sampleTokenIdxNoTarget(target, dataset) for _ in range(K)]
+
+    grad = np.zeros(outputVectors.shape)
+    gradPred = np.zeros(predicted.shape)
+    cost = 0.0
+
+    sig_positive = sigmoid(np.dot(outputVectors[target], predicted))
+    cost += -np.log(sig_positive)
+    gradPred += (sig_positive - 1) * outputVectors[target]
+    grad[target] += (sig_positive - 1) * predicted
+
+    for idx in sampleIndices:
+        sig_neg = sigmoid(-np.dot(outputVectors[idx], predicted))
+        cost -= np.log(sig_neg)
+        gradPred -= (sig_neg - 1) * outputVectors[idx]
+        grad[idx] += -(sig_neg - 1) * predicted
     
     return cost, gradPred, grad
 
@@ -110,9 +133,20 @@ def skipgram(currentWord, C, contextWords, tokens, inputVectors, outputVectors,
     # - cost: the cost function value for the skip-gram model       
     # - grad: the gradient with respect to the word vectors
 
-    ### YOUR CODE HERE
-    raise NotImplementedError
-    ### END YOUR CODE
+    cost = 0.0
+    gradIn = np.zeros(inputVectors.shape)
+    gradOut = np.zeros(outputVectors.shape)
+
+    input_index = tokens[currentWord]
+    output_index = [tokens[i] for i in contextWords]
+
+    vhat = inputVectors[input_index]
+
+    for o_i in output_index:
+        cost_i, gradPred_i, grad_i = word2vecCostAndGradient(vhat, o_i, outputVectors, dataset)
+        cost += cost_i
+        gradIn[input_index] += gradPred_i
+        gradOut += grad_i
     
     return cost, gradIn, gradOut
 

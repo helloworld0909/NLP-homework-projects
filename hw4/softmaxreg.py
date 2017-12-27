@@ -32,12 +32,18 @@ def getSentenceFeature(tokens, wordVectors, sentence):
     # Output:                                                         
     # - sentVector: feature vector for the sentence    
     
-    sentVector = np.zeros((wordVectors.shape[1],))
-    
-    ### YOUR CODE HERE
-    raise NotImplementedError
-    ### END YOUR CODE
-    
+    # sentVector = np.zeros((wordVectors.shape[1],))
+
+    sentMatrix = np.empty((len(sentence), wordVectors.shape[1]))
+    for idx, word in enumerate(sentence):
+        word_vec = wordVectors[tokens.get(word, -1), :]
+        sentMatrix[idx] = word_vec
+
+    # u, s, v = np.linalg.svd(sentMatrix)
+    # sentVector = v[np.argmax(s), :]
+
+    sentVector = np.sum(sentMatrix, axis=0) / len(sentence)
+
     return sentVector
 
 def softmaxRegression(features, labels, weights, regularization = 0.0, nopredictions = False):

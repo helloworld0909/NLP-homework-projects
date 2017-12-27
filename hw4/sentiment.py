@@ -3,10 +3,11 @@ from sgd import load_saved_params, sgd
 from softmaxreg import softmaxRegression, getSentenceFeature, accuracy, softmax_wrapper
 
 from data_utils import *
+import numpy as np
 
 # Try different regularizations and pick the best!
 # NOTE: fill in one more "your code here" below before running!
-REGULARIZATION = None   # Assign a list of floats in the block below
+REGULARIZATION = np.logspace(-5, 0, 6)  # Assign a list of floats in the block below
 ### YOUR CODE HERE
 #raise NotImplementedError
 ### END YOUR CODE
@@ -49,7 +50,7 @@ for regularization in REGULARIZATION:
 
     # We will do batch optimization
     weights = sgd(lambda weights: softmax_wrapper(trainFeatures, trainLabels, 
-        weights, regularization), weights, 3.0, 10000, PRINT_EVERY=100)
+        weights, regularization), weights, 10.0, 50000, PRINT_EVERY=1000)
 
     # Test on train set
     _, _, pred = softmaxRegression(trainFeatures, trainLabels, weights)
@@ -77,8 +78,9 @@ for result in results:
 print()
 
 # Pick the best regularization parameters
-BEST_REGULARIZATION = None
-BEST_WEIGHTS = None
+BEST_RESULT = max(results, key=lambda r: r['dev'])
+BEST_REGULARIZATION = BEST_RESULT['reg']
+BEST_WEIGHTS = BEST_RESULT['weights']
 
 ### YOUR CODE HERE 
 #raise NotImplementedError
