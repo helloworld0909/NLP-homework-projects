@@ -43,6 +43,8 @@ def getSentenceFeature(tokens, wordVectors, sentence):
     # sentVector = v[np.argmax(s), :]
 
     sentVector = np.sum(sentMatrix, axis=0) / len(sentence)
+    # sentVector = sentMatrix.max(axis=0)
+    # sentVector /= np.linalg.norm(sentVector)
 
     return sentVector
 
