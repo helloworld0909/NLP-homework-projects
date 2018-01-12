@@ -1,4 +1,4 @@
-package com.helloworld09.nlp;
+package com.helloworld09.nlp.util;
 
 import org.apache.log4j.BasicConfigurator;
 
@@ -18,12 +18,16 @@ import java.util.*;
 
 public class Pipeline {
 
-    private Annotation annotate(String text, String property) {
+    private StanfordCoreNLP pipeline;
 
+    public Pipeline(String property) {
         // creates a StanfordCoreNLP object, with POS tagging, lemmatization, NER, parsing, and coreference resolution
         Properties props = new Properties();
         props.setProperty("annotators", property);
-        StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+        pipeline = new StanfordCoreNLP(props);
+    }
+
+    public Annotation annotate(String text) {
 
         // create an empty Annotation just with the given text
         Annotation document = new Annotation(text);
@@ -37,16 +41,17 @@ public class Pipeline {
     public static void main(String[] args) {
         BasicConfigurator.configure();
 
-        Pipeline ppl = new Pipeline();
         String property = "tokenize, ssplit, pos, lemma, ner, parse, dcoref";
+        Pipeline ppl = new Pipeline(property);
+
         String text = "This project aims to predict what will happen next given a sequence of events in history";
-        Annotation document = ppl.annotate(text, property);
+        Annotation document = ppl.annotate(text);
         List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 
-        for(CoreMap sentence: sentences) {
+        for (CoreMap sentence : sentences) {
             // traversing the words in the current sentence
             // a CoreLabel is a CoreMap with additional token-specific methods
-            for (CoreLabel token: sentence.get(TokensAnnotation.class)) {
+            for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
                 // this is the text of the token
                 String word = token.get(TextAnnotation.class);
                 // this is the POS tag of the token
