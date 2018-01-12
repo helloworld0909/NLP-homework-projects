@@ -69,10 +69,9 @@ public class Pipeline {
             // this is the Stanford dependency graph of the current sentence
             SemanticGraph dependencies = sentence.get(EnhancedDependenciesAnnotation.class);
             System.out.println(dependencies);
-
-            Map<Integer, CorefChain> graph = document.get(CorefChainAnnotation.class);
-            System.out.println(graph);
         }
+        Map<Integer, CorefChain> graph = document.get(CorefChainAnnotation.class);
+        System.out.println(graph);
     }
 
 }

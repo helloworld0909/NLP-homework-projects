@@ -15,12 +15,12 @@ import org.apache.log4j.BasicConfigurator;
 
 public class Interpreter {
 
-    public static AbstractMap<String, List<SemanticGraphEdge>> filterRelnsByDep(SemanticGraph dependencies, String[] depFilters) {
+    public static AbstractMap<String, List<SemanticGraphEdge>> filterRelnsByDep(SemanticGraph dependencies, GrammaticalRelation[] filters) {
         HashMap<String, List<SemanticGraphEdge>> filteredRelationMap = new HashMap<>();
-        for (String dep: depFilters) {
-            GrammaticalRelation relation = new GrammaticalRelation(Language.Any, dep, "Subject", null);
-            List<SemanticGraphEdge> relns = dependencies.findAllRelns(relation);
-            filteredRelationMap.put(dep, relns);
+        for (GrammaticalRelation filter: filters) {
+
+            List<SemanticGraphEdge> relns = dependencies.findAllRelns(filter);
+            filteredRelationMap.put(filter.getShortName(), relns);
         }
         return filteredRelationMap;
     }
@@ -36,8 +36,11 @@ public class Interpreter {
         List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
         for (CoreMap sentence : sentences) {
             SemanticGraph dependencies = sentence.get(SemanticGraphCoreAnnotations.EnhancedDependenciesAnnotation.class);
-            String[] depFilters = {"nsubj", "dobj"};
-            System.out.println(filterRelnsByDep(dependencies, depFilters));
+            GrammaticalRelation[] filters = {
+                    new GrammaticalRelation(Language.Any, "nsubj", "Subject", null),
+                    new GrammaticalRelation(Language.Any, "dobj", "Object", null),
+            };
+            System.out.println(filterRelnsByDep(dependencies, filters));
         }
     }
 }
