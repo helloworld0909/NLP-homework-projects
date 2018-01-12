@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.helloworld09.nlp</groupId>
-    <artifactId>final pj</artifactId>
+    <artifactId>finalpj</artifactId>
     <version>0.1</version>
 
     <build>
@@ -34,12 +34,6 @@
             <version>3.8.0</version>
             <classifier>models</classifier>
         </dependency>
-        <dependency>
-            <groupId>edu.stanford.nlp</groupId>
-            <artifactId>stanford-corenlp</artifactId>
-            <version>3.8.0</version>
-            <classifier>models-english</classifier>
-        </dependency>
 
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -57,6 +51,14 @@
             <artifactId>jaxp-api</artifactId>
             <version>1.4.5</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.json/json -->
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20171018</version>
+        </dependency>
+
 
     </dependencies>
 
