@@ -10,8 +10,8 @@ import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.EnhancedDependenciesAnnotation;
-import edu.stanford.nlp.dcoref.CorefChain;
-import edu.stanford.nlp.dcoref.CorefCoreAnnotations.CorefChainAnnotation;
+import edu.stanford.nlp.coref.data.CorefChain;
+import edu.stanford.nlp.coref.CorefCoreAnnotations.CorefChainAnnotation;
 
 
 import java.util.*;
@@ -41,10 +41,10 @@ public class Pipeline {
     public static void main(String[] args) {
         BasicConfigurator.configure();
 
-        String property = "tokenize, ssplit, pos, lemma, ner, parse, dcoref";
+        String property = "tokenize, ssplit, pos, lemma, ner, parse, mention, coref";
         Pipeline ppl = new Pipeline(property);
 
-        String text = "This project aims to predict what will happen next given a sequence of events in history";
+        String text = "Barack Obama was born in Hawaii.  He is the president. Obama was elected in 2008.";
         Annotation document = ppl.annotate(text);
         List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 
