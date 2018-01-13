@@ -94,6 +94,8 @@ public class EventChain {
 
         List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
 
+        Map<IntPair, SemanticGraphEdge> edgeMapByVerbPosition = new HashMap<>();
+        Map<IntPair, SemanticGraphEdge> edgeMapByProtaPosition = new HashMap<>();
         // Indexed from 1
         for (int sentNum = 1; sentNum <= sentences.size(); sentNum++) {
             CoreMap sentence = sentences.get(sentNum - 1);
@@ -106,18 +108,29 @@ public class EventChain {
                     IndexedWord protagonist = protaAndVerb.first();
                     IndexedWord verb = protaAndVerb.second();
 
+                    IntPair verbPosition = new IntPair(sentNum, verb.index());
                     IntPair protagonistPosition = new IntPair(sentNum, protagonist.index());
-                    for (CorefChain chain : graph.values()) {
-                        if (chain.getMentionsWithSameHead(protagonistPosition) != null) {
-                            int chainID = chain.getChainID();
-                            eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
-                            Event event = new Event(verb, protagonist, edge.getRelation().getShortName());
-                            eventChainsMap.get(chainID).add(event);
-                        }
-                    }
+                    edgeMapByVerbPosition.put(verbPosition, edge);
+                    edgeMapByProtaPosition.put(protagonistPosition, edge);
                 }
             }
         }
+        for (Map.Entry<IntPair, SemanticGraphEdge> entry: edgeMapByProtaPosition.entrySet()){
+            for (CorefChain chain : graph.values()) {
+                if (chain.getMentionsWithSameHead(entry.getKey()) != null) {
+                    int chainID = chain.getChainID();
+                    SemanticGraphEdge edge = entry.getValue();
+                    Pair<IndexedWord, IndexedWord> protaAndVerb = getProtaAndVerb(edge);
+                    IndexedWord protagonist = protaAndVerb.first();
+                    IndexedWord verb = protaAndVerb.second();
+
+                    eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
+                    Event event = new Event(verb, protagonist, edge.getRelation().getShortName());
+                    eventChainsMap.get(chainID).add(event);
+                }
+            }
+        }
+
         logger.debug("Finish extracting event chain");
         return new ArrayList<>(eventChainsMap.values());
     }
@@ -155,59 +168,4 @@ public class EventChain {
         else
             logger.error("Input dir path not found");
     }
-}
-
-class Event {
-    private IndexedWord verb;
-    private IndexedWord protagonist;
-
-    private enum EventRelation {
-        SUBJ, OBJ
-    }
-
-    private EventRelation relation;
-    private Logger logger = Logger.getLogger(Event.class);
-
-    public Event(IndexedWord verb, IndexedWord protagonist, String relation) {
-        this.verb = verb;
-        this.protagonist = protagonist;
-        switch (relation) {
-            case "nsubj":
-                this.relation = EventRelation.SUBJ;
-                break;
-            case "dobj":
-                this.relation = EventRelation.OBJ;
-                break;
-            default:
-                logger.error("Error event construction! relation = " + relation);
-        }
-    }
-
-    public Event(IndexedWord verb, IndexedWord protagonist, GrammaticalRelation relation) {
-        this.verb = verb;
-        this.protagonist = protagonist;
-        switch (relation.getShortName()) {
-            case "nsobj":
-                this.relation = EventRelation.SUBJ;
-                break;
-            case "dobj":
-                this.relation = EventRelation.OBJ;
-                break;
-            default:
-                logger.error("Error event construction! relation = " + relation);
-        }
-    }
-
-    @Override
-    public String toString() {
-        return verb.value() + "\t" + protagonist.value() + "\t" + StringUtils.lowerCase(relation.toString());
-    }
-
-    public String toString(boolean lemma) {
-        if (lemma)
-            return verb.value() + "\t" + verb.get(CoreAnnotations.LemmaAnnotation.class) + "\t" + protagonist.value() + "\t" + StringUtils.lowerCase(relation.toString());
-        else
-            return toString();
-    }
-
 }
