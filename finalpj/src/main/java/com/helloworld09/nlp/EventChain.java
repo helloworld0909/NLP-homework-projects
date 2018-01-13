@@ -5,18 +5,22 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.io.FileWriter;
 
 import edu.stanford.nlp.coref.CorefCoreAnnotations;
 import edu.stanford.nlp.coref.data.CorefChain;
 import edu.stanford.nlp.international.Language;
 import edu.stanford.nlp.ling.CoreAnnotations;
+import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations;
+import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 import edu.stanford.nlp.trees.GrammaticalRelation;
 import edu.stanford.nlp.util.CoreMap;
+import edu.stanford.nlp.util.IntPair;
+import edu.stanford.nlp.util.Pair;
 
 import org.apache.log4j.BasicConfigurator;
 import org.json.JSONObject;
@@ -39,10 +43,12 @@ public class EventChain {
         pipeline = new Pipeline(property);
     }
 
-    public void buildEventChain(String filename, GrammaticalRelation[] filters) {
+    public void buildEventChain(String filename, String outputFileName, GrammaticalRelation[] filters) {
         try {
             String content = readFile(filename, StandardCharsets.UTF_8);
             JSONArray obj = new JSONArray(content);
+            FileWriter outputFile = new FileWriter(outputFileName);
+
             for (int i = 0; i < obj.length(); i++) {
                 JSONObject docObj = obj.getJSONObject(i);
 
@@ -55,21 +61,66 @@ public class EventChain {
                         docBuilder.append('\n');
                     }
                     String text = docBuilder.toString();
-                    Annotation document = pipeline.annotate(text);
-                    List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
-                    for (CoreMap sentence : sentences) {
-                        SemanticGraph dependencies = sentence.get(SemanticGraphCoreAnnotations.EnhancedDependenciesAnnotation.class);
-                        Map relations = Interpreter.filterRelnsByDep(dependencies, filters);
+                    List<List<Event>> eventChains = extractEventChains(text, filters);
+                    for (int chainIdx = 0; chainIdx < eventChains.size(); chainIdx++) {
+                        outputFile.write("CHAIN\t" + chainIdx + "\n");
+                        for (Event e : eventChains.get(chainIdx)) {
+                            outputFile.write(e.toString() + "\n");
+                        }
                     }
-                    Map<Integer, CorefChain> graph = document.get(CorefCoreAnnotations.CorefChainAnnotation.class);
-                    System.out.println(graph);
-
+                    outputFile.flush();
                 }
             }
+            outputFile.close();
+
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
             logger.info("Finish building event chain");
+        }
+    }
+
+    private List<List<Event>> extractEventChains(String text, GrammaticalRelation[] filters) {
+
+        Map<Integer, List<Event>> eventChainsMap = new HashMap<>();
+        Annotation document = pipeline.annotate(text);
+
+        Map<Integer, CorefChain> graph = document.get(CorefCoreAnnotations.CorefChainAnnotation.class);
+
+        List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
+
+        // Indexed from 1
+        for (int sentNum = 1; sentNum <= sentences.size(); sentNum++) {
+            CoreMap sentence = sentences.get(sentNum - 1);
+            SemanticGraph dependencies = sentence.get(SemanticGraphCoreAnnotations.EnhancedDependenciesAnnotation.class);
+            Map<String, List<SemanticGraphEdge>> relations = Interpreter.filterRelnsByDep(dependencies, filters);
+            for (GrammaticalRelation filter : filters) {
+                String shortName = filter.getShortName();
+                for (SemanticGraphEdge edge : relations.get(shortName)) {
+                    Pair<IndexedWord, IndexedWord> protaAndVerb = getProtaAndVerb(edge);
+                    IndexedWord protagonist = protaAndVerb.first();
+                    IndexedWord verb = protaAndVerb.second();
+
+                    IntPair protagonistPosition = new IntPair(sentNum, protagonist.index());
+                    for (CorefChain chain : graph.values()) {
+                        if (chain.getMentionsWithSameHead(protagonistPosition) != null) {
+                            int chainID = chain.getChainID();
+                            eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
+                            Event event = new Event(verb, protagonist, edge.getRelation().getShortName());
+                            eventChainsMap.get(chainID).add(event);
+                        }
+                    }
+                }
+            }
+        }
+        return new ArrayList<>(eventChainsMap.values());
+    }
+
+    private Pair<IndexedWord, IndexedWord> getProtaAndVerb(SemanticGraphEdge edge) {
+        if (!edge.getSource().tag().startsWith("V")) {
+            return new Pair<>(edge.getSource(), edge.getTarget());
+        } else {
+            return new Pair<>(edge.getTarget(), edge.getSource());
         }
     }
 
@@ -85,6 +136,54 @@ public class EventChain {
                 new GrammaticalRelation(Language.Any, "nsubj", "Subject", null),
                 new GrammaticalRelation(Language.Any, "dobj", "Object", null),
         };
-        eventChainBuilder.buildEventChain("data/nyt_eng_199407.json", filters);
+        String fileName = "nyt_eng_199407.json";
+        eventChainBuilder.buildEventChain("data/" + fileName, "output/" + fileName, filters);
+    }
+}
+
+class Event {
+    private IndexedWord verb;
+    private IndexedWord protagonist;
+
+    private enum EventRelation {
+        SUBJ, OBJ
+    }
+
+    private EventRelation relation;
+    private Logger logger = Logger.getLogger(Event.class);
+
+    public Event(IndexedWord verb, IndexedWord protagonist, String relation) {
+        this.verb = verb;
+        this.protagonist = protagonist;
+        switch (relation) {
+            case "nsubj":
+                this.relation = EventRelation.SUBJ;
+                break;
+            case "dobj":
+                this.relation = EventRelation.OBJ;
+                break;
+            default:
+                logger.error("Error event construction! relation = " + relation);
+        }
+    }
+
+    public Event(IndexedWord verb, IndexedWord protagonist, GrammaticalRelation relation) {
+        this.verb = verb;
+        this.protagonist = protagonist;
+        switch (relation.getShortName()) {
+            case "nsobj":
+                this.relation = EventRelation.SUBJ;
+                break;
+            case "dobj":
+                this.relation = EventRelation.OBJ;
+                break;
+            default:
+                logger.error("Error event construction! relation = " + relation);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return verb.value() + "\t" + protagonist.value() + "\t" + StringUtils.lowerCase(relation.toString());
     }
 }
