@@ -1,5 +1,6 @@
 package com.helloworld09.nlp;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -72,14 +73,13 @@ public class EventChain {
                     }
                     outputFile.flush();
                 }
-                break;
             }
             outputFile.close();
 
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            logger.info("Finish building event chain");
+            logger.info("Finish building event train on " + filename);
         }
     }
 
@@ -139,8 +139,19 @@ public class EventChain {
                 new GrammaticalRelation(Language.Any, "nsubj", "Subject", null),
                 new GrammaticalRelation(Language.Any, "dobj", "Object", null),
         };
-        String fileName = "nyt_eng_199407.json";
-        eventChainBuilder.buildEventChain("data/" + fileName, "output/" + fileName, filters);
+        String inputDirPath = "data/";
+        File inputDir = new File(inputDirPath);
+        if (inputDir.exists()) {
+            String fileNameList[] = inputDir.list();
+            System.out.println(Arrays.toString(fileNameList));
+            for (String fileName : fileNameList) {
+                if(fileName.endsWith(".json")) {
+                    eventChainBuilder.buildEventChain("data/" + fileName, "output/" + fileName.split("\\.")[0] + ".txt", filters);
+                }
+            }
+        }
+        else
+            logger.error("Input dir path not found");
     }
 }
 
