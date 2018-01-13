@@ -23,6 +23,7 @@ import edu.stanford.nlp.util.CoreMap;
 import edu.stanford.nlp.util.IntPair;
 import edu.stanford.nlp.util.Pair;
 
+import edu.stanford.nlp.util.Quadruple;
 import org.apache.log4j.BasicConfigurator;
 import org.json.JSONObject;
 import org.json.JSONArray;
@@ -31,6 +32,8 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.helloworld09.nlp.util.Pipeline;
 import com.helloworld09.nlp.util.Interpreter;
+import com.helloworld09.nlp.Event.*;
+
 
 
 public class EventChain {
@@ -85,17 +88,11 @@ public class EventChain {
         }
     }
 
-    private List<List<Event>> extractEventChains(String text, GrammaticalRelation[] filters) {
+    private void getEdgeMaps(List<CoreMap> sentences,
+                             GrammaticalRelation[] filters,
+                             Map<IntPair, List<SemanticGraphEdge>> edgeMapByVerbPosition,
+                             Map<IntPair, List<SemanticGraphEdge>> edgeMapByProtaPosition){
 
-        Map<Integer, List<Event>> eventChainsMap = new HashMap<>();
-        Annotation document = pipeline.annotate(text);
-
-        Map<Integer, CorefChain> graph = document.get(CorefCoreAnnotations.CorefChainAnnotation.class);
-
-        List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
-
-        Map<IntPair, SemanticGraphEdge> edgeMapByVerbPosition = new HashMap<>();
-        Map<IntPair, SemanticGraphEdge> edgeMapByProtaPosition = new HashMap<>();
         // Indexed from 1
         for (int sentNum = 1; sentNum <= sentences.size(); sentNum++) {
             CoreMap sentence = sentences.get(sentNum - 1);
@@ -104,38 +101,113 @@ public class EventChain {
             for (GrammaticalRelation filter : filters) {
                 String shortName = filter.getShortName();
                 for (SemanticGraphEdge edge : relations.get(shortName)) {
-                    Pair<IndexedWord, IndexedWord> protaAndVerb = getProtaAndVerb(edge);
+                    Pair<IndexedWord, IndexedWord> protaAndVerb = getNounAndVerb(edge);
                     IndexedWord protagonist = protaAndVerb.first();
                     IndexedWord verb = protaAndVerb.second();
 
                     IntPair verbPosition = new IntPair(sentNum, verb.index());
                     IntPair protagonistPosition = new IntPair(sentNum, protagonist.index());
-                    edgeMapByVerbPosition.put(verbPosition, edge);
-                    edgeMapByProtaPosition.put(protagonistPosition, edge);
+
+                    edgeMapByVerbPosition.putIfAbsent(verbPosition, new LinkedList<>());
+                    edgeMapByProtaPosition.putIfAbsent(protagonistPosition, new LinkedList<>());
+                    edgeMapByVerbPosition.get(verbPosition).add(edge);
+                    edgeMapByProtaPosition.get(protagonistPosition).add(edge);
+
                 }
             }
         }
-        for (Map.Entry<IntPair, SemanticGraphEdge> entry: edgeMapByProtaPosition.entrySet()){
+    }
+
+    private List<List<Event>> extractEventChains(String text, GrammaticalRelation[] filters) {
+
+        Map<Integer, List<Event>> eventChainsMap = new HashMap<>();
+        Map<Integer, List<Event>> detailEventChainsMap = new HashMap<>();
+
+        Annotation document = pipeline.annotate(text);
+
+        Map<Integer, CorefChain> graph = document.get(CorefCoreAnnotations.CorefChainAnnotation.class);
+
+        List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
+
+        Map<IntPair, List<SemanticGraphEdge>> edgeMapByVerbPosition = new LinkedHashMap<>();
+        Map<IntPair, List<SemanticGraphEdge>> edgeMapByProtaPosition = new LinkedHashMap<>();
+        getEdgeMaps(sentences, filters, edgeMapByVerbPosition, edgeMapByProtaPosition);
+
+        for (Map.Entry<IntPair, List<SemanticGraphEdge>> entry : edgeMapByProtaPosition.entrySet()) {
             for (CorefChain chain : graph.values()) {
-                if (chain.getMentionsWithSameHead(entry.getKey()) != null) {
+                IntPair protaPosition = entry.getKey();
+                if (chain.getMentionMap().get(protaPosition) != null) {
                     int chainID = chain.getChainID();
-                    SemanticGraphEdge edge = entry.getValue();
-                    Pair<IndexedWord, IndexedWord> protaAndVerb = getProtaAndVerb(edge);
-                    IndexedWord protagonist = protaAndVerb.first();
-                    IndexedWord verb = protaAndVerb.second();
+                    List<SemanticGraphEdge> protaRelatedEdges = entry.getValue();
+                    for (SemanticGraphEdge protaRelatedEdge : protaRelatedEdges) {
+                        Pair<IndexedWord, IndexedWord> protaAndVerb = getNounAndVerb(protaRelatedEdge);
+                        IndexedWord protagonist = protaAndVerb.first();
+                        IndexedWord verb = protaAndVerb.second();
 
-                    eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
-                    Event event = new Event(verb, protagonist, edge.getRelation().getShortName());
-                    eventChainsMap.get(chainID).add(event);
+                        eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
+                        String chainRelationStr = protaRelatedEdge.getRelation().getShortName();
+                        Event event = new Event(verb, protagonist, chainRelationStr);
+                        eventChainsMap.get(chainID).add(event);
+
+                        IndexedWord subject = null, object = null, prepositionalEntity = null;
+                        switch (Event.convertRelation(protaRelatedEdge).toString()) {
+                            case "SUBJ": {
+                                subject = protagonist;
+                                break;
+                            }
+                            case "OBJ":
+                                object = protagonist;
+                                break;
+                            default:
+                                logger.error("edge = " + protaRelatedEdge);
+                        }
+
+                        IntPair verbPosition = new IntPair(protaPosition.get(0), verb.index());
+                        List<SemanticGraphEdge> verbRelatedEdges = edgeMapByVerbPosition.get(verbPosition);
+
+                        // Add additional information
+                        if (verbRelatedEdges.size() > 1) {
+                            for (SemanticGraphEdge relatedEdge : verbRelatedEdges) {
+                                String relationStr = relatedEdge.getRelation().getShortName();
+
+                                IndexedWord indexedWord = getNounAndVerb(relatedEdge).first();
+
+                                if (!indexedWord.equals(protagonist)) {
+                                    if (!relationStr.equals(chainRelationStr)) {
+                                        switch (Event.convertRelationToString(chainRelationStr)) {
+                                            case "SUBJ": {
+                                                object = indexedWord;
+                                                break;
+                                            }
+                                            case "OBJ": {
+                                                subject = indexedWord;
+                                                break;
+                                            }
+                                        }
+
+                                    }
+                                    if (relationStr.equals("PREP") & !indexedWord.get(CoreAnnotations.NamedEntityTagAnnotation.class).equals("O")) {
+                                        prepositionalEntity = indexedWord;
+                                    }
+                                }
+                            }
+                        }
+
+                        Quadruple<IndexedWord, IndexedWord, IndexedWord, IndexedWord> params = new Quadruple<>(verb, subject, object, prepositionalEntity);
+                        Event detailEvent = new ComplexEvent(params, chainRelationStr);
+                        detailEventChainsMap.putIfAbsent(chainID, new ArrayList<>());
+                        detailEventChainsMap.get(chainID).add(detailEvent);
+                    }
+                    break;
                 }
             }
         }
-
+        System.out.println(detailEventChainsMap);
         logger.debug("Finish extracting event chain");
         return new ArrayList<>(eventChainsMap.values());
     }
 
-    private Pair<IndexedWord, IndexedWord> getProtaAndVerb(SemanticGraphEdge edge) {
+    private Pair<IndexedWord, IndexedWord> getNounAndVerb(SemanticGraphEdge edge) {
         if (!edge.getSource().tag().startsWith("V")) {
             return new Pair<>(edge.getSource(), edge.getTarget());
         } else {
@@ -154,18 +226,21 @@ public class EventChain {
         GrammaticalRelation[] filters = {
                 new GrammaticalRelation(Language.Any, "nsubj", "Subject", null),
                 new GrammaticalRelation(Language.Any, "dobj", "Object", null),
+                new GrammaticalRelation(Language.Any, "nsubjpass", "SubjectPass", null),
+                new GrammaticalRelation(Language.Any, "pobj", "ObjectPreposition", null),
+                new GrammaticalRelation(Language.Any, "prep", "Preposition", null),
+                new GrammaticalRelation(Language.Any, "prepc", "PrepositionClausal", null),
         };
         String inputDirPath = "data/";
         File inputDir = new File(inputDirPath);
         if (inputDir.exists()) {
             String fileNameList[] = inputDir.list();
             for (String fileName : fileNameList) {
-                if(fileName.endsWith(".json")) {
+                if (fileName.endsWith(".json")) {
                     eventChainBuilder.buildEventChain("data/" + fileName, "output/" + fileName.split("\\.")[0] + ".txt", filters);
                 }
             }
-        }
-        else
+        } else
             logger.error("Input dir path not found");
     }
 }
