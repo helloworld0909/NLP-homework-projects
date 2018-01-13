@@ -66,10 +66,11 @@ public class EventChain {
                     List<List<Event>> eventChains = extractEventChains(text, filters);
                     int chainIdx = 0;
                     for (List<Event> chain : eventChains) {
-                        outputFile.write("CHAIN\t" + docID + "\t" + chainIdx + "\n");
+                        outputFile.write(docID + "\t" + chainIdx + "\n");
                         for (Event e : chain) {
                             outputFile.write(e.toString(true) + "\n");
                         }
+                        outputFile.write("\n");
                         chainIdx++;
                     }
                     outputFile.flush();
@@ -93,37 +94,26 @@ public class EventChain {
 
         List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
 
-        Map<IntPair, List<Event>> eventLookup = new HashMap<>();
         // Indexed from 1
         for (int sentNum = 1; sentNum <= sentences.size(); sentNum++) {
             CoreMap sentence = sentences.get(sentNum - 1);
             SemanticGraph dependencies = sentence.get(SemanticGraphCoreAnnotations.EnhancedDependenciesAnnotation.class);
             Map<String, List<SemanticGraphEdge>> relations = Interpreter.filterRelnsByDep(dependencies, filters);
-
             for (GrammaticalRelation filter : filters) {
                 String shortName = filter.getShortName();
                 for (SemanticGraphEdge edge : relations.get(shortName)) {
                     Pair<IndexedWord, IndexedWord> protaAndVerb = getProtaAndVerb(edge);
                     IndexedWord protagonist = protaAndVerb.first();
                     IndexedWord verb = protaAndVerb.second();
-                    Event event = new Event(verb, protagonist, edge.getRelation().getShortName());
 
-                    IntPair eventPosition = new IntPair(sentNum, protagonist.index());
-
-                    eventLookup.putIfAbsent(eventPosition, new ArrayList<>());
-                    eventLookup.get(eventPosition).add(event);
-                }
-            }
-        }
-
-        for (CorefChain chain : graph.values()) {
-            for (CorefChain.CorefMention mention: chain.getMentionsInTextualOrder()){
-                List<Event> eventList = eventLookup.get(mention.position);
-                if (eventList != null) {
-                    int chainID = chain.getChainID();
-                    for(Event event: eventList){
-                        eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
-                        eventChainsMap.get(chainID).add(event);
+                    IntPair protagonistPosition = new IntPair(sentNum, protagonist.index());
+                    for (CorefChain chain : graph.values()) {
+                        if (chain.getMentionsWithSameHead(protagonistPosition) != null) {
+                            int chainID = chain.getChainID();
+                            eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
+                            Event event = new Event(verb, protagonist, edge.getRelation().getShortName());
+                            eventChainsMap.get(chainID).add(event);
+                        }
                     }
                 }
             }
