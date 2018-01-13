@@ -2,23 +2,24 @@ package com.helloworld09.nlp;
 
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.IndexedWord;
+import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 import edu.stanford.nlp.trees.GrammaticalRelation;
 import edu.stanford.nlp.util.Quadruple;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+
+enum EventRelation {
+    SUBJ, OBJ, PREP, OTHER
+}
 
 class Event implements Serializable {
     private IndexedWord verb;
     private IndexedWord protagonist;
 
-    protected enum EventRelation {
-        SUBJ, OBJ, UNKNOWN
-    }
-
     protected EventRelation relation;
-    private Logger logger = Logger.getLogger(Event.class);
 
     public Event() {
     }
@@ -35,18 +36,33 @@ class Event implements Serializable {
         this.relation = convertRelation(reln.getShortName());
     }
 
-    public EventRelation convertRelation(String relation) {
+    public static EventRelation convertRelation(String relation) {
         EventRelation reln;
 
         if (relation.contains("subj")) {
             reln = EventRelation.SUBJ;
         } else if (relation.contains("obj")) {
             reln = EventRelation.OBJ;
+        } else if (relation.contains("prep")) {
+            reln = EventRelation.PREP;
         } else {
+            Logger logger = Logger.getLogger(Event.class);
             logger.error("Error event construction! relation = " + relation);
-            reln = EventRelation.UNKNOWN;
+            reln = EventRelation.OTHER;
         }
         return reln;
+    }
+
+    public static EventRelation convertRelation(SemanticGraphEdge relation){
+        return convertRelation(relation.getRelation().getShortName());
+    }
+
+    public static String convertRelationToString(String relation){
+        return convertRelation(relation).toString();
+    }
+
+    public static String convertRelationToString(SemanticGraphEdge relation){
+        return convertRelation(relation).toString();
     }
 
     @Override
@@ -79,13 +95,13 @@ class ComplexEvent extends Event implements Serializable {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(verb.value());
-        sb.append(String.valueOf(verb.get(CoreAnnotations.LemmaAnnotation.class)));
-        sb.append(String.valueOf(subject.value()));
-        sb.append(String.valueOf(object.value()));
-        sb.append(String.valueOf(preposition.value()));
-        sb.append(StringUtils.lowerCase(relation.toString()));
+        ArrayList<String> sb = new ArrayList<>();
+        sb.add(verb.value());
+        sb.add(String.valueOf(verb.get(CoreAnnotations.LemmaAnnotation.class)));
+        sb.add(String.valueOf(subject));
+        sb.add(String.valueOf(object));
+        sb.add(String.valueOf(preposition));
+        sb.add(StringUtils.lowerCase(relation.toString()));
         return String.join("\t", sb);
     }
 
