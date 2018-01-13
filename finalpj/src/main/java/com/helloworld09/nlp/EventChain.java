@@ -49,6 +49,7 @@ public class EventChain {
             JSONArray obj = new JSONArray(content);
             FileWriter outputFile = new FileWriter(outputFileName);
 
+            int chainIdx = 0;
             for (int i = 0; i < obj.length(); i++) {
                 JSONObject docObj = obj.getJSONObject(i);
 
@@ -62,14 +63,16 @@ public class EventChain {
                     }
                     String text = docBuilder.toString();
                     List<List<Event>> eventChains = extractEventChains(text, filters);
-                    for (int chainIdx = 0; chainIdx < eventChains.size(); chainIdx++) {
+                    for (List<Event> chain : eventChains) {
                         outputFile.write("CHAIN\t" + chainIdx + "\n");
-                        for (Event e : eventChains.get(chainIdx)) {
-                            outputFile.write(e.toString() + "\n");
+                        for (Event e : chain) {
+                            outputFile.write(e.toString(true) + "\n");
                         }
+                        chainIdx++;
                     }
                     outputFile.flush();
                 }
+                break;
             }
             outputFile.close();
 
@@ -186,4 +189,12 @@ class Event {
     public String toString() {
         return verb.value() + "\t" + protagonist.value() + "\t" + StringUtils.lowerCase(relation.toString());
     }
+
+    public String toString(boolean lemma) {
+        if (lemma)
+            return verb.value() + "\t" + verb.get(CoreAnnotations.LemmaAnnotation.class) + "\t" + protagonist.value() + "\t" + StringUtils.lowerCase(relation.toString());
+        else
+            return toString();
+    }
+
 }
