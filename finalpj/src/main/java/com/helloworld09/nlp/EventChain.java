@@ -32,8 +32,6 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.helloworld09.nlp.util.Pipeline;
 import com.helloworld09.nlp.util.Interpreter;
-import com.helloworld09.nlp.Event.*;
-
 
 
 public class EventChain {
@@ -47,11 +45,16 @@ public class EventChain {
         pipeline = new Pipeline(property);
     }
 
-    public void buildEventChain(String filename, String outputFileName, GrammaticalRelation[] filters) {
+    public void buildEventChain(String filename, GrammaticalRelation[] filters) {
+        String inputDir = "data/";
+        String outputEventDir = "output/event/";
+        String outputDetailEventDir = "output/event_detail/";
+
         try {
-            String content = readFile(filename, StandardCharsets.UTF_8);
+            String content = readFile(inputDir + filename, StandardCharsets.UTF_8);
             JSONArray obj = new JSONArray(content);
-            FileWriter outputFile = new FileWriter(outputFileName);
+            FileWriter outputFile1 = new FileWriter(outputEventDir + filename.split("\\.")[0] + ".txt");
+            FileWriter outputFile2 = new FileWriter(outputDetailEventDir + filename.split("\\.")[0] + ".txt");
 
             for (int i = 0; i < obj.length(); i++) {
                 JSONObject docObj = obj.getJSONObject(i);
@@ -66,20 +69,35 @@ public class EventChain {
                         docBuilder.append('\n');
                     }
                     String text = docBuilder.toString();
-                    List<List<Event>> eventChains = extractEventChains(text, filters);
-                    int chainIdx = 0;
+                    Pair<List<List<Event>>, List<List<Event>>> twoEventChains = extractEventChains(text, filters);
+                    List<List<Event>> eventChains = twoEventChains.first();
+                    List<List<Event>> detailEventChains = twoEventChains.second();
+
+                    int chainIdx1 = 0;
+                    int chainIdx2 = 0;
                     for (List<Event> chain : eventChains) {
-                        outputFile.write(docID + "\t" + chainIdx + "\n");
+                        outputFile1.write(docID + "\t" + chainIdx1 + "\n");
                         for (Event e : chain) {
-                            outputFile.write(e.toString(true) + "\n");
+                            outputFile1.write(e.toString(true) + "\n");
                         }
-                        outputFile.write("\n");
-                        chainIdx++;
+                        outputFile1.write("\n");
+                        chainIdx1++;
                     }
-                    outputFile.flush();
+                    outputFile1.flush();
+
+                    for (List<Event> chain : detailEventChains) {
+                        outputFile2.write(docID + "\t" + chainIdx2 + "\n");
+                        for (Event e : chain) {
+                            outputFile2.write(e.toString() + "\n");
+                        }
+                        outputFile2.write("\n");
+                        chainIdx2++;
+                    }
+                    outputFile2.flush();
                 }
             }
-            outputFile.close();
+            outputFile1.close();
+            outputFile2.close();
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -91,7 +109,7 @@ public class EventChain {
     private void getEdgeMaps(List<CoreMap> sentences,
                              GrammaticalRelation[] filters,
                              Map<IntPair, List<SemanticGraphEdge>> edgeMapByVerbPosition,
-                             Map<IntPair, List<SemanticGraphEdge>> edgeMapByProtaPosition){
+                             Map<IntPair, List<SemanticGraphEdge>> edgeMapByProtaPosition) {
 
         // Indexed from 1
         for (int sentNum = 1; sentNum <= sentences.size(); sentNum++) {
@@ -118,7 +136,7 @@ public class EventChain {
         }
     }
 
-    private List<List<Event>> extractEventChains(String text, GrammaticalRelation[] filters) {
+    private Pair<List<List<Event>>, List<List<Event>>> extractEventChains(String text, GrammaticalRelation[] filters) {
 
         Map<Integer, List<Event>> eventChainsMap = new HashMap<>();
         Map<Integer, List<Event>> detailEventChainsMap = new HashMap<>();
@@ -202,9 +220,11 @@ public class EventChain {
                 }
             }
         }
-        System.out.println(detailEventChainsMap);
         logger.debug("Finish extracting event chain");
-        return new ArrayList<>(eventChainsMap.values());
+        Pair<List<List<Event>>, List<List<Event>>> ret = new Pair<>();
+        ret.setFirst(new ArrayList<>(eventChainsMap.values()));
+        ret.setSecond(new ArrayList<>(detailEventChainsMap.values()));
+        return ret;
     }
 
     private Pair<IndexedWord, IndexedWord> getNounAndVerb(SemanticGraphEdge edge) {
@@ -235,9 +255,10 @@ public class EventChain {
         File inputDir = new File(inputDirPath);
         if (inputDir.exists()) {
             String fileNameList[] = inputDir.list();
+            logger.debug(Arrays.toString(fileNameList));
             for (String fileName : fileNameList) {
                 if (fileName.endsWith(".json")) {
-                    eventChainBuilder.buildEventChain("data/" + fileName, "output/" + fileName.split("\\.")[0] + ".txt", filters);
+                    eventChainBuilder.buildEventChain(fileName, filters);
                 }
             }
         } else
