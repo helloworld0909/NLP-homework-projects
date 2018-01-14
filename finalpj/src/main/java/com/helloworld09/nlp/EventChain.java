@@ -274,6 +274,7 @@ public class EventChain {
         if (inputDirFile.exists()) {
             String fileNameList[] = inputDirFile.list();
             if (fileNameList != null) {
+                Arrays.sort(fileNameList);
                 for (String fileName : fileNameList) {
                     if (fileName.endsWith(".json")) {
                         eventChainBuilder.buildEventChain(fileName, filters, inputDir, outputEventDir, outputDetailEventDir);
