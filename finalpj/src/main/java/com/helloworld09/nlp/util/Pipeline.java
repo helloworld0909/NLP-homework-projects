@@ -27,6 +27,11 @@ public class Pipeline {
         pipeline = new StanfordCoreNLP(props);
     }
 
+    public Pipeline(Properties property) {
+        // creates a StanfordCoreNLP object, with POS tagging, lemmatization, NER, parsing, and coreference resolution
+        pipeline = new StanfordCoreNLP(property);
+    }
+
     public Annotation annotate(String text) {
 
         // create an empty Annotation just with the given text
