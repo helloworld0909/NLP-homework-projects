@@ -51,16 +51,13 @@ public class EventChain {
         pipeline = new Pipeline(property);
     }
 
-    public void buildEventChain(String filename, GrammaticalRelation[] filters) {
-        String inputDir = "data/";
-        String outputEventDir = "output/event/";
-        String outputDetailEventDir = "output/event_detail/";
+    public void buildEventChain(String filename, GrammaticalRelation[] filters, String inputDir, String outputEventDir, String outputDetailEventDir) {
 
         try {
             String content = readFile(inputDir + filename, StandardCharsets.UTF_8);
             JSONArray obj = new JSONArray(content);
-            FileWriter outputFile1 = new FileWriter(outputEventDir + filename.split("\\.")[0] + ".txt");
-            FileWriter outputFile2 = new FileWriter(outputDetailEventDir + filename.split("\\.")[0] + ".txt");
+            FileWriter outputFile = new FileWriter(outputEventDir + filename.split("\\.")[0] + ".txt");
+            FileWriter outputFileDetail = new FileWriter(outputDetailEventDir + filename.split("\\.")[0] + ".txt");
 
             for (int i = 0; i < obj.length(); i++) {
                 JSONObject docObj = obj.getJSONObject(i);
@@ -82,28 +79,28 @@ public class EventChain {
                     int chainIdx1 = 0;
                     int chainIdx2 = 0;
                     for (List<Event> chain : eventChains) {
-                        outputFile1.write(docID + "\t" + chainIdx1 + "\n");
+                        outputFile.write(docID + "\t" + chainIdx1 + "\n");
                         for (Event e : chain) {
-                            outputFile1.write(e.toString(true) + "\n");
+                            outputFile.write(e.toString(true) + "\n");
                         }
-                        outputFile1.write("\n");
+                        outputFile.write("\n");
                         chainIdx1++;
                     }
-                    outputFile1.flush();
+                    outputFile.flush();
 
                     for (List<Event> chain : detailEventChains) {
-                        outputFile2.write(docID + "\t" + chainIdx2 + "\n");
+                        outputFileDetail.write(docID + "\t" + chainIdx2 + "\n");
                         for (Event e : chain) {
-                            outputFile2.write(e.toString() + "\n");
+                            outputFileDetail.write(e.toString() + "\n");
                         }
-                        outputFile2.write("\n");
+                        outputFileDetail.write("\n");
                         chainIdx2++;
                     }
-                    outputFile2.flush();
+                    outputFileDetail.flush();
                 }
             }
-            outputFile1.close();
-            outputFile2.close();
+            outputFile.close();
+            outputFileDetail.close();
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -157,83 +154,86 @@ public class EventChain {
         Map<IntPair, List<SemanticGraphEdge>> edgeMapByProtaPosition = new LinkedHashMap<>();
         getEdgeMaps(sentences, filters, edgeMapByVerbPosition, edgeMapByProtaPosition);
 
-        for (Map.Entry<IntPair, List<SemanticGraphEdge>> entry : edgeMapByProtaPosition.entrySet()) {
-            for (CorefChain chain : graph.values()) {
-                IntPair protaPosition = entry.getKey();
-                if (chain.getMentionMap().get(protaPosition) != null) {
-                    int chainID = chain.getChainID();
-                    List<SemanticGraphEdge> protaRelatedEdges = entry.getValue();
-                    for (SemanticGraphEdge protaRelatedEdge : protaRelatedEdges) {
-                        Pair<IndexedWord, IndexedWord> protaAndVerb = getNounAndVerb(protaRelatedEdge);
-                        IndexedWord protagonist = protaAndVerb.first();
-                        IndexedWord verb = protaAndVerb.second();
+        for (CorefChain chain : graph.values()) {
+            int chainID = chain.getChainID();
+            for (CorefChain.CorefMention mention : chain.getMentionsInTextualOrder()) {
+                IntPair mentionPosition = new IntPair();
+                int sentNum = mention.sentNum;
+                mentionPosition.set(0, sentNum);
+                mentionPosition.set(1, mention.headIndex);
+                List<SemanticGraphEdge> protaRelatedEdges = edgeMapByProtaPosition.get(mentionPosition);
+                if (protaRelatedEdges == null)
+                    continue;
+                for (SemanticGraphEdge protaRelatedEdge : protaRelatedEdges) {
+                    Pair<IndexedWord, IndexedWord> protaAndVerb = getNounAndVerb(protaRelatedEdge);
+                    IndexedWord protagonist = protaAndVerb.first();
+                    IndexedWord verb = protaAndVerb.second();
 
-                        String chainRelationName = protaRelatedEdge.getRelation().getShortName();
-                        String chainRelationStr = Event.convertRelationToString(chainRelationName);
+                    String chainRelationName = protaRelatedEdge.getRelation().getShortName();
+                    String chainRelationStr = Event.convertRelationToString(chainRelationName);
 
-                        // edge from protagonist should be either nsubj or dobj, cannot be other
-                        if (!chainRelationStr.equals("SUBJ") & !chainRelationStr.equals("OBJ")) {
+                    // edge from protagonist should be either nsubj or dobj, cannot be other
+                    if (!chainRelationStr.equals("SUBJ") & !chainRelationStr.equals("OBJ")) {
+                        break;
+                    }
+
+                    // Add simple event to result chains
+                    Event event = new Event(verb, protagonist, chainRelationName);
+                    eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
+                    eventChainsMap.get(chainID).add(event);
+
+                    // Add additional information
+                    IndexedWord subject = null, object = null, prepositionalEntity = null;
+                    switch (Event.convertRelationToString(chainRelationName)) {
+                        case "SUBJ": {
+                            subject = protagonist;
                             break;
                         }
-
-                        // Add simple event to result chains
-                        Event event = new Event(verb, protagonist, chainRelationName);
-                        eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
-                        eventChainsMap.get(chainID).add(event);
-
-                        IndexedWord subject = null, object = null, prepositionalEntity = null;
-                        switch (Event.convertRelationToString(chainRelationName)) {
-                            case "SUBJ": {
-                                subject = protagonist;
-                                break;
-                            }
-                            case "OBJ": {
-                                object = protagonist;
-                                break;
-                            }
+                        case "OBJ": {
+                            object = protagonist;
+                            break;
                         }
+                    }
 
-                        IntPair verbPosition = new IntPair(protaPosition.get(0), verb.index());
-                        List<SemanticGraphEdge> verbRelatedEdges = edgeMapByVerbPosition.get(verbPosition);
+                    IntPair verbPosition = new IntPair(sentNum, verb.index());
+                    List<SemanticGraphEdge> verbRelatedEdges = edgeMapByVerbPosition.get(verbPosition);
 
-                        // Add additional information
-                        if (verbRelatedEdges.size() > 1) {
-                            for (SemanticGraphEdge relatedEdge : verbRelatedEdges) {
-                                String relationName = relatedEdge.getRelation().getShortName();
 
-                                IndexedWord indexedWord = getNounAndVerb(relatedEdge).first();
+                    if (verbRelatedEdges.size() > 1) {
+                        for (SemanticGraphEdge relatedEdge : verbRelatedEdges) {
+                            String relationName = relatedEdge.getRelation().getShortName();
 
-                                if (!indexedWord.equals(protagonist)) {
-                                    if (!relationName.equals(chainRelationName)) {
-                                        switch (Event.convertRelationToString(relationName)) {
-                                            case "SUBJ": {
-                                                subject = indexedWord;
-                                                break;
-                                            }
-                                            case "OBJ": {
-                                                object = indexedWord;
-                                                break;
-                                            }
-                                            case "IOBJ": {
-                                                prepositionalEntity = indexedWord;
-                                                break;
-                                            }
+                            IndexedWord indexedWord = getNounAndVerb(relatedEdge).first();
+
+                            if (!indexedWord.equals(protagonist)) {
+                                if (!relationName.equals(chainRelationName)) {
+                                    switch (Event.convertRelationToString(relationName)) {
+                                        case "SUBJ": {
+                                            subject = indexedWord;
+                                            break;
+                                        }
+                                        case "OBJ": {
+                                            object = indexedWord;
+                                            break;
+                                        }
+                                        case "IOBJ": {
+                                            prepositionalEntity = indexedWord;
+                                            break;
                                         }
                                     }
                                 }
                             }
                         }
-
-                        Quadruple<IndexedWord, IndexedWord, IndexedWord, IndexedWord> params = new Quadruple<>(verb, subject, object, prepositionalEntity);
-                        Event detailEvent = new ComplexEvent(params, chainRelationName);
-                        detailEventChainsMap.putIfAbsent(chainID, new ArrayList<>());
-                        detailEventChainsMap.get(chainID).add(detailEvent);
                     }
-                    // Only search in one co-reference chain
-                    break;
+
+                    Quadruple<IndexedWord, IndexedWord, IndexedWord, IndexedWord> params = new Quadruple<>(verb, subject, object, prepositionalEntity);
+                    Event detailEvent = new ComplexEvent(params, chainRelationName);
+                    detailEventChainsMap.putIfAbsent(chainID, new ArrayList<>());
+                    detailEventChainsMap.get(chainID).add(detailEvent);
                 }
             }
         }
+
         logger.debug("Finish extracting event chain");
         Pair<List<List<Event>>, List<List<Event>>> ret = new Pair<>();
         ret.setFirst(new ArrayList<>(eventChainsMap.values()));
@@ -266,16 +266,22 @@ public class EventChain {
                 new GrammaticalRelation(Language.Any, "nsubjpass", "SubjectPass", null),
                 new GrammaticalRelation(Language.Any, "iobj", "IndirectObject", null),
         };
-        String inputDirPath = "data/";
-        File inputDir = new File(inputDirPath);
-        if (inputDir.exists()) {
-            String fileNameList[] = inputDir.list();
-            logger.debug(Arrays.toString(fileNameList));
-            for (String fileName : fileNameList) {
-                if (fileName.endsWith(".json")) {
-                    eventChainBuilder.buildEventChain(fileName, filters);
+
+        String inputDir = "data/";
+        String outputEventDir = "output/event/";
+        String outputDetailEventDir = "output/event_detail/";
+        File inputDirFile = new File(inputDir);
+        if (inputDirFile.exists()) {
+            String fileNameList[] = inputDirFile.list();
+            if (fileNameList != null) {
+                for (String fileName : fileNameList) {
+                    if (fileName.endsWith(".json")) {
+                        eventChainBuilder.buildEventChain(fileName, filters, inputDir, outputEventDir, outputDetailEventDir);
+                    }
                 }
             }
+            else
+                logger.warn("Empty input dir");
         } else
             logger.error("Input dir path not found");
     }
