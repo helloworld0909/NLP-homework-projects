@@ -12,7 +12,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 
 enum EventRelation {
-    SUBJ, OBJ, PREP, OTHER
+    SUBJ, OBJ, IOBJ, OTHER
 }
 
 class Event implements Serializable {
@@ -41,10 +41,10 @@ class Event implements Serializable {
 
         if (relation.contains("subj")) {
             reln = EventRelation.SUBJ;
-        } else if (relation.contains("obj")) {
+        } else if (relation.equals("dobj")) {
             reln = EventRelation.OBJ;
-        } else if (relation.contains("prep")) {
-            reln = EventRelation.PREP;
+        } else if (relation.equals("iobj")) {
+            reln = EventRelation.IOBJ;
         } else {
             Logger logger = Logger.getLogger(Event.class);
             logger.error("Error event construction! relation = " + relation);

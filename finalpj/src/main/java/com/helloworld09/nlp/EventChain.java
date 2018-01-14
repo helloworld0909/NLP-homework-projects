@@ -45,6 +45,12 @@ public class EventChain {
         pipeline = new Pipeline(property);
     }
 
+    public EventChain(Properties property) {
+
+        logger = Logger.getLogger(EventChain.class);
+        pipeline = new Pipeline(property);
+    }
+
     public void buildEventChain(String filename, GrammaticalRelation[] filters) {
         String inputDir = "data/";
         String outputEventDir = "output/event/";
@@ -162,22 +168,29 @@ public class EventChain {
                         IndexedWord protagonist = protaAndVerb.first();
                         IndexedWord verb = protaAndVerb.second();
 
+                        String chainRelationName = protaRelatedEdge.getRelation().getShortName();
+                        String chainRelationStr = Event.convertRelationToString(chainRelationName);
+
+                        // edge from protagonist should be either nsubj or dobj, cannot be other
+                        if (!chainRelationStr.equals("SUBJ") & !chainRelationStr.equals("OBJ")) {
+                            break;
+                        }
+
+                        // Add simple event to result chains
+                        Event event = new Event(verb, protagonist, chainRelationName);
                         eventChainsMap.putIfAbsent(chainID, new ArrayList<>());
-                        String chainRelationStr = protaRelatedEdge.getRelation().getShortName();
-                        Event event = new Event(verb, protagonist, chainRelationStr);
                         eventChainsMap.get(chainID).add(event);
 
                         IndexedWord subject = null, object = null, prepositionalEntity = null;
-                        switch (Event.convertRelation(protaRelatedEdge).toString()) {
+                        switch (Event.convertRelationToString(chainRelationName)) {
                             case "SUBJ": {
                                 subject = protagonist;
                                 break;
                             }
-                            case "OBJ":
+                            case "OBJ": {
                                 object = protagonist;
                                 break;
-                            default:
-                                logger.error("edge = " + protaRelatedEdge);
+                            }
                         }
 
                         IntPair verbPosition = new IntPair(protaPosition.get(0), verb.index());
@@ -186,36 +199,37 @@ public class EventChain {
                         // Add additional information
                         if (verbRelatedEdges.size() > 1) {
                             for (SemanticGraphEdge relatedEdge : verbRelatedEdges) {
-                                String relationStr = relatedEdge.getRelation().getShortName();
+                                String relationName = relatedEdge.getRelation().getShortName();
 
                                 IndexedWord indexedWord = getNounAndVerb(relatedEdge).first();
 
                                 if (!indexedWord.equals(protagonist)) {
-                                    if (!relationStr.equals(chainRelationStr)) {
-                                        switch (Event.convertRelationToString(chainRelationStr)) {
+                                    if (!relationName.equals(chainRelationName)) {
+                                        switch (Event.convertRelationToString(relationName)) {
                                             case "SUBJ": {
-                                                object = indexedWord;
-                                                break;
-                                            }
-                                            case "OBJ": {
                                                 subject = indexedWord;
                                                 break;
                                             }
+                                            case "OBJ": {
+                                                object = indexedWord;
+                                                break;
+                                            }
+                                            case "IOBJ": {
+                                                prepositionalEntity = indexedWord;
+                                                break;
+                                            }
                                         }
-
-                                    }
-                                    if (relationStr.equals("PREP") & !indexedWord.get(CoreAnnotations.NamedEntityTagAnnotation.class).equals("O")) {
-                                        prepositionalEntity = indexedWord;
                                     }
                                 }
                             }
                         }
 
                         Quadruple<IndexedWord, IndexedWord, IndexedWord, IndexedWord> params = new Quadruple<>(verb, subject, object, prepositionalEntity);
-                        Event detailEvent = new ComplexEvent(params, chainRelationStr);
+                        Event detailEvent = new ComplexEvent(params, chainRelationName);
                         detailEventChainsMap.putIfAbsent(chainID, new ArrayList<>());
                         detailEventChainsMap.get(chainID).add(detailEvent);
                     }
+                    // Only search in one co-reference chain
                     break;
                 }
             }
@@ -242,14 +256,15 @@ public class EventChain {
 
     public static void main(String[] args) {
         BasicConfigurator.configure();
-        EventChain eventChainBuilder = new EventChain("tokenize, ssplit, pos, lemma, ner, parse, mention, coref");
+        Properties props = new Properties();
+        props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, mention, coref");
+        props.put("threads", "4");
+        EventChain eventChainBuilder = new EventChain(props);
         GrammaticalRelation[] filters = {
                 new GrammaticalRelation(Language.Any, "nsubj", "Subject", null),
                 new GrammaticalRelation(Language.Any, "dobj", "Object", null),
                 new GrammaticalRelation(Language.Any, "nsubjpass", "SubjectPass", null),
-                new GrammaticalRelation(Language.Any, "pobj", "ObjectPreposition", null),
-                new GrammaticalRelation(Language.Any, "prep", "Preposition", null),
-                new GrammaticalRelation(Language.Any, "prepc", "PrepositionClausal", null),
+                new GrammaticalRelation(Language.Any, "iobj", "IndirectObject", null),
         };
         String inputDirPath = "data/";
         File inputDir = new File(inputDirPath);
